@@ -14,8 +14,11 @@ public class AnimalTrackingController : MonoBehaviour
         [Tooltip("Nome exato definido na Reference Image Library.")]
         public string markerName;
 
-        [Tooltip("Prefab que será exibido quando este marker for reconhecido.")]
+        [Tooltip("Prefab exibido quando este marker for reconhecido.")]
         public GameObject animalPrefab;
+
+        [Tooltip("Som reproduzido pelo botão para este animal.")]
+        public AudioClip animalSound;
 
         [Header("Transformação")]
         [Tooltip("Escala usada para este modelo.")]
@@ -41,15 +44,22 @@ public class AnimalTrackingController : MonoBehaviour
     private Camera arCamera;
 
     private ARTrackedImageManager trackedImageManager;
+    private AudioSource audioSource;
 
     private readonly Dictionary<TrackableId, GameObject> spawnedAnimals =
         new Dictionary<TrackableId, GameObject>();
 
+    private readonly Dictionary<TrackableId, AudioClip> spawnedSounds =
+        new Dictionary<TrackableId, AudioClip>();
+
     public GameObject CurrentAnimal { get; private set; }
+
+    private AudioClip currentSound;
 
     private void Awake()
     {
-        trackedImageManager = GetComponent<ARTrackedImageManager>();
+        trackedImageManager =
+            GetComponent<ARTrackedImageManager>();
 
         if (arCamera == null)
         {
@@ -62,6 +72,16 @@ public class AnimalTrackingController : MonoBehaviour
                 "AnimalTrackingController: nenhuma câmera AR foi encontrada."
             );
         }
+
+        audioSource = GetComponent<AudioSource>();
+
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        audioSource.playOnAwake = false;
+        audioSource.loop = false;
     }
 
     private void OnEnable()
@@ -137,18 +157,31 @@ public class AnimalTrackingController : MonoBehaviour
             return;
         }
 
-        GameObject animal = Instantiate(config.animalPrefab);
+        GameObject animal =
+            Instantiate(config.animalPrefab);
 
-        animal.name = "CurrentAnimal_" + detectedMarkerName;
+        animal.name =
+            "CurrentAnimal_" + detectedMarkerName;
 
-        PositionAnimalInFrontOfCamera(animal, config);
+        PositionAnimalInFrontOfCamera(
+            animal,
+            config
+        );
 
         spawnedAnimals.Add(
             trackedImage.trackableId,
             animal
         );
 
-        SetCurrentAnimal(animal);
+        spawnedSounds.Add(
+            trackedImage.trackableId,
+            config.animalSound
+        );
+
+        SetCurrentAnimal(
+            animal,
+            config.animalSound
+        );
 
         UpdateAnimal(trackedImage);
     }
@@ -198,7 +231,8 @@ public class AnimalTrackingController : MonoBehaviour
             Vector3.one * config.scale;
     }
 
-    private void UpdateAnimal(ARTrackedImage trackedImage)
+    private void UpdateAnimal(
+        ARTrackedImage trackedImage)
     {
         if (!spawnedAnimals.TryGetValue(
                 trackedImage.trackableId,
@@ -215,11 +249,20 @@ public class AnimalTrackingController : MonoBehaviour
 
         if (shouldBeVisible)
         {
-            SetCurrentAnimal(animal);
+            spawnedSounds.TryGetValue(
+                trackedImage.trackableId,
+                out AudioClip animalSound
+            );
+
+            SetCurrentAnimal(
+                animal,
+                animalSound
+            );
         }
     }
 
-    private void RemoveAnimal(ARTrackedImage trackedImage)
+    private void RemoveAnimal(
+        ARTrackedImage trackedImage)
     {
         if (!spawnedAnimals.TryGetValue(
                 trackedImage.trackableId,
@@ -228,7 +271,13 @@ public class AnimalTrackingController : MonoBehaviour
             return;
         }
 
-        spawnedAnimals.Remove(trackedImage.trackableId);
+        spawnedAnimals.Remove(
+            trackedImage.trackableId
+        );
+
+        spawnedSounds.Remove(
+            trackedImage.trackableId
+        );
 
         if (CurrentAnimal == animal)
         {
@@ -238,9 +287,12 @@ public class AnimalTrackingController : MonoBehaviour
         Destroy(animal);
     }
 
-    private void SetCurrentAnimal(GameObject animal)
+    private void SetCurrentAnimal(
+        GameObject animal,
+        AudioClip animalSound)
     {
         CurrentAnimal = animal;
+        currentSound = animalSound;
 
         Variables.Scene(gameObject.scene).Set(
             "modelObject",
@@ -251,10 +303,38 @@ public class AnimalTrackingController : MonoBehaviour
     private void ClearCurrentAnimal()
     {
         CurrentAnimal = null;
+        currentSound = null;
 
         Variables.Scene(gameObject.scene).Set(
             "modelObject",
             (GameObject)null
         );
+
+        if (audioSource.isPlaying)
+        {
+            audioSource.Stop();
+        }
+    }
+
+    public void PlayCurrentAnimalSound()
+    {
+        if (CurrentAnimal == null)
+        {
+            Debug.LogWarning(
+                "Não existe um animal ativo no momento."
+            );
+            return;
+        }
+
+        if (currentSound == null)
+        {
+            Debug.LogWarning(
+                "O animal atual não possui som configurado."
+            );
+            return;
+        }
+
+        audioSource.Stop();
+        audioSource.PlayOneShot(currentSound);
     }
 }
