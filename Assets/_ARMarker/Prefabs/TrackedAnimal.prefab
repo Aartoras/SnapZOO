@@ -9,6 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5877343382642253436}
+  - component: {fileID: -1284627128618254395}
   m_Layer: 0
   m_Name: TrackedAnimal
   m_TagString: Untagged
@@ -32,6 +33,19 @@ Transform:
   - {fileID: 5393530975531273537}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &-1284627128618254395
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5335620232868982485}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fc80b91a23a6ce11c850d6e4202dc6e8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  anteaterPrefab: {fileID: 4888311040755547080, guid: cbed2c5a6bc560d918070013415330c7, type: 3}
 --- !u!1 &6056911880209422673
 GameObject:
   m_ObjectHideFlags: 0
