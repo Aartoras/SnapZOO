@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
@@ -11,8 +12,12 @@ public class AnimalTrackingController : MonoBehaviour
     [Serializable]
     public class AnimalMarkerConfig
     {
+        [Header("Identificação do marker")]
+
         [Tooltip("Nome exato definido na Reference Image Library.")]
         public string markerName;
+
+        [Header("Modelo e som")]
 
         [Tooltip("Prefab exibido quando este marker for reconhecido.")]
         public GameObject animalPrefab;
@@ -20,7 +25,25 @@ public class AnimalTrackingController : MonoBehaviour
         [Tooltip("Som reproduzido pelo botão para este animal.")]
         public AudioClip animalSound;
 
+        [Header("Informações do animal")]
+
+        [Tooltip("Nome comum exibido no painel.")]
+        public string displayName;
+
+        [Tooltip("Nome científico exibido no painel.")]
+        public string scientificName;
+
+        [Tooltip("Bioma ou habitat principal.")]
+        public string biome;
+
+        [Tooltip("Tipo de alimentação.")]
+        public string diet;
+
+        [Tooltip("Nível de risco ou estado de conservação.")]
+        public string risk;
+
         [Header("Transformação")]
+
         [Tooltip("Escala usada para este modelo.")]
         public float scale = 0.001f;
 
@@ -39,9 +62,28 @@ public class AnimalTrackingController : MonoBehaviour
     private List<AnimalMarkerConfig> animals =
         new List<AnimalMarkerConfig>();
 
-    [Header("Câmera")]
+    [Header("Câmera AR")]
     [SerializeField]
     private Camera arCamera;
+
+    [Header("Painel de informações")]
+    [SerializeField]
+    private GameObject animalInfoPanel;
+
+    [SerializeField]
+    private TMP_Text animalNameText;
+
+    [SerializeField]
+    private TMP_Text scientificNameText;
+
+    [SerializeField]
+    private TMP_Text biomeText;
+
+    [SerializeField]
+    private TMP_Text dietText;
+
+    [SerializeField]
+    private TMP_Text riskText;
 
     private ARTrackedImageManager trackedImageManager;
     private AudioSource audioSource;
@@ -49,12 +91,13 @@ public class AnimalTrackingController : MonoBehaviour
     private readonly Dictionary<TrackableId, GameObject> spawnedAnimals =
         new Dictionary<TrackableId, GameObject>();
 
-    private readonly Dictionary<TrackableId, AudioClip> spawnedSounds =
-        new Dictionary<TrackableId, AudioClip>();
+    private readonly Dictionary<TrackableId, AnimalMarkerConfig> spawnedConfigs =
+        new Dictionary<TrackableId, AnimalMarkerConfig>();
 
     public GameObject CurrentAnimal { get; private set; }
 
     private AudioClip currentSound;
+    private AnimalMarkerConfig currentAnimalConfig;
 
     private void Awake()
     {
@@ -82,6 +125,12 @@ public class AnimalTrackingController : MonoBehaviour
 
         audioSource.playOnAwake = false;
         audioSource.loop = false;
+
+        // Garante que o painel comece fechado.
+        if (animalInfoPanel != null)
+        {
+            animalInfoPanel.SetActive(false);
+        }
     }
 
     private void OnEnable()
@@ -173,14 +222,14 @@ public class AnimalTrackingController : MonoBehaviour
             animal
         );
 
-        spawnedSounds.Add(
+        spawnedConfigs.Add(
             trackedImage.trackableId,
-            config.animalSound
+            config
         );
 
         SetCurrentAnimal(
             animal,
-            config.animalSound
+            config
         );
 
         UpdateAnimal(trackedImage);
@@ -249,15 +298,19 @@ public class AnimalTrackingController : MonoBehaviour
 
         if (shouldBeVisible)
         {
-            spawnedSounds.TryGetValue(
+            spawnedConfigs.TryGetValue(
                 trackedImage.trackableId,
-                out AudioClip animalSound
+                out AnimalMarkerConfig config
             );
 
             SetCurrentAnimal(
                 animal,
-                animalSound
+                config
             );
+        }
+        else if (CurrentAnimal == animal)
+        {
+            CloseAnimalInfo();
         }
     }
 
@@ -275,7 +328,7 @@ public class AnimalTrackingController : MonoBehaviour
             trackedImage.trackableId
         );
 
-        spawnedSounds.Remove(
+        spawnedConfigs.Remove(
             trackedImage.trackableId
         );
 
@@ -289,10 +342,13 @@ public class AnimalTrackingController : MonoBehaviour
 
     private void SetCurrentAnimal(
         GameObject animal,
-        AudioClip animalSound)
+        AnimalMarkerConfig config)
     {
         CurrentAnimal = animal;
-        currentSound = animalSound;
+        currentAnimalConfig = config;
+        currentSound = config != null
+            ? config.animalSound
+            : null;
 
         Variables.Scene(gameObject.scene).Set(
             "modelObject",
@@ -304,6 +360,7 @@ public class AnimalTrackingController : MonoBehaviour
     {
         CurrentAnimal = null;
         currentSound = null;
+        currentAnimalConfig = null;
 
         Variables.Scene(gameObject.scene).Set(
             "modelObject",
@@ -314,6 +371,8 @@ public class AnimalTrackingController : MonoBehaviour
         {
             audioSource.Stop();
         }
+
+        CloseAnimalInfo();
     }
 
     public void PlayCurrentAnimalSound()
@@ -336,5 +395,74 @@ public class AnimalTrackingController : MonoBehaviour
 
         audioSource.Stop();
         audioSource.PlayOneShot(currentSound);
+    }
+
+    public void OpenAnimalInfo()
+    {
+        if (CurrentAnimal == null || currentAnimalConfig == null)
+        {
+            Debug.LogWarning(
+                "Não existe um animal ativo para mostrar informações."
+            );
+            return;
+        }
+
+        if (animalInfoPanel == null)
+        {
+            Debug.LogError(
+                "AnimalInfoPanel não foi configurado no Inspector."
+            );
+            return;
+        }
+
+        SetText(
+            animalNameText,
+            currentAnimalConfig.displayName
+        );
+
+        SetText(
+            scientificNameText,
+            currentAnimalConfig.scientificName
+        );
+
+        SetText(
+            biomeText,
+            currentAnimalConfig.biome
+        );
+
+        SetText(
+            dietText,
+            currentAnimalConfig.diet
+        );
+
+        SetText(
+            riskText,
+            currentAnimalConfig.risk
+        );
+
+        animalInfoPanel.SetActive(true);
+    }
+
+    public void CloseAnimalInfo()
+    {
+        if (animalInfoPanel != null)
+        {
+            animalInfoPanel.SetActive(false);
+        }
+    }
+
+    private void SetText(
+        TMP_Text textComponent,
+        string value)
+    {
+        if (textComponent == null)
+        {
+            return;
+        }
+
+        textComponent.text =
+            string.IsNullOrWhiteSpace(value)
+                ? "Não informado"
+                : value;
     }
 }
